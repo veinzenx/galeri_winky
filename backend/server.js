@@ -1,4 +1,3 @@
-
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
@@ -6,7 +5,6 @@ const bcrypt = require('bcrypt');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-
 const app = express();
 const PORT = 1910;
 
@@ -658,6 +656,6 @@ app.use((err, req, res, next) => {
 });
 
 // JALANKAN SERVER
-app.listen(PORT, () => {
-    console.log(`Server berjalan di http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server berjalan di port ${PORT}`);
 });
