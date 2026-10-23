@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 
-const API = 'http://192.168.137.1:1910';
+const API = 'http://localhost:1910';
 
 const formKategori = { nama_kategori: '' };
 
