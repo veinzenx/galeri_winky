@@ -2,10 +2,15 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
+const authJWT = require('./middleware');
 const fs = require('fs');
 const app = express();
+console.log('server Galeri Winky berjalan');
+console.log('LOKASI FILE:', __filename);
+require('dotenv').config();
 const PORT = 1910;
 
 const db = mysql.createConnection({
@@ -92,6 +97,28 @@ app.get('/foto', (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(hasil);
     });
+});
+app.get('/api/profile', authJWT, (req, res) => {
+    db.query(
+        'SELECT id_pengguna, nama_pengguna, email_pengguna FROM pengguna WHERE id_pengguna = ?',
+        [req.user.id],
+        (err, hasil) => {
+            if (err) {
+                return res.status(500).json({
+                    message: 'Gagal mengambil data profil'
+                });
+            }
+            if (hasil.length === 0) {
+                return res.status(404).json({
+                    message: 'Pengguna tidak ditemukan'
+                });
+            }
+            res.json({
+                message: 'Profil berhasil diambil',
+                pengguna: hasil[0]
+            });
+        }
+    );
 });
 app.post('/kategori', (req, res) => {
     const nama = req.body.nama_kategori;
@@ -206,10 +233,55 @@ app.post('/foto', upload.single('file_foto'), (req, res) => {
         }
     );
 });
+app.post('/login', (req, res) => {
+    const { email_pengguna, password_email } = req.body;
+    if (!email_pengguna || !password_email) {
+        return res.status(400).json({
+            message: 'Email dan password wajib diisi'
+        });
+    }
+    db.query(
+        'SELECT * FROM pengguna WHERE email_pengguna = ?',
+        [email_pengguna],
+        async (err, hasil) => {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            if (hasil.length === 0) {
+                return res.status(401).json({
+                    message: 'Login gagal, email atau password salah'
+                });
+            }
+            const pengguna = hasil[0];
+            const cocok = await bcrypt.compare(
+                password_email,
+                pengguna.password_email
+            );
+            if (!cocok) {
+                return res.status(401).json({
+                    message: 'Login gagal, email atau password salah'
+                });
+            }
+            const token = jwt.sign(
+                { id: pengguna.id_pengguna },
+                process.env.JWT_SECRET,
+                { expiresIn: '1h' }
+            );
+            res.json({
+                message: 'Login berhasil',
+                token: token,
+                pengguna: {
+                    id_pengguna: pengguna.id_pengguna,
+                    nama_pengguna: pengguna.nama_pengguna,
+                    email_pengguna: pengguna.email_pengguna
+                }
+            });
+        }
+    );
+});
 app.put('/kategori/:id_kategori', (req, res) => {
     const id = req.params.id_kategori;
     const nama = req.body.nama_kategori;
-
     if (typeof nama !== 'string' || !nama.trim()) {
         return res.status(400).json({
             message: 'Nama kategori wajib diisi'
@@ -275,7 +347,6 @@ app.put('/pengguna/:id_pengguna', async (req, res) => {
         }
         db.query(sql, values, (err, hasil) => {
             if (err) return res.status(500).json({ error: err.message });
-
             if (hasil.affectedRows === 0) {
                 return db.query(
                     'SELECT id_pengguna FROM pengguna WHERE id_pengguna = ?',
@@ -320,14 +391,12 @@ app.put('/foto/:id_foto', upload.single('file_foto'), (req, res) => {
                 if (req.file) hapusFileFoto(req.file.filename);
                 return res.status(500).json({ error: err.message });
             }
-
             if (data.length === 0) {
                 if (req.file) hapusFileFoto(req.file.filename);
                 return res.status(404).json({
                     message: 'Foto tidak ditemukan'
                 });
             }
-
             const fileLama = data[0].file_foto;
             const fileBaru = req.file
                 ? `uploads/${req.file.filename}`
@@ -500,7 +569,6 @@ app.use((err, req, res, next) => {
     }
     next();
 });
-
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server berjalan di port ${PORT}`);
 });
